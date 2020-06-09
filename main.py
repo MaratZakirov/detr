@@ -83,7 +83,7 @@ def get_args_parser():
                         help="Relative classification weight of the no-object class")
 
     # dataset parameters
-    parser.add_argument('--dataset_file', default='coco')
+    parser.add_argument('--dataset_file', default='yolo')
     parser.add_argument('--coco_path', type=str)
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--yolo_path', type=str)
@@ -209,7 +209,6 @@ def main(args):
 
     exit()
     """
-
 
     print("Start training")
     start_time = time.time()

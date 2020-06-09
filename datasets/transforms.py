@@ -12,6 +12,8 @@ import torchvision.transforms.functional as F
 from util.box_ops import box_xyxy_to_cxcywh, box_cxcywh_to_xyxy
 from util.misc import interpolate, showImage
 
+from torch.nn import functional as tfunc
+
 
 def xy2xy4(xy2):
     assert xy2.shape[1] == 4
@@ -29,6 +31,61 @@ def xy4xy2(xy4):
     xy2 = torch.stack([xy4[:, 0::2].min(dim=1)[0], xy4[:, 1::2].min(dim=1)[0],
                        xy4[:, 0::2].max(dim=1)[0], xy4[:, 1::2].max(dim=1)[0]]).t()
     return xy2
+
+def shuffle(image, target, keep):
+    img_s = T.ToTensor()(image)
+    img_t = torch.clone(img_s)
+    img_mask = torch.zeros(img_s.shape[1], img_s.shape[2])
+
+    for x1, y1, x2, y2 in target['boxes']:
+        img_mask[int(y1) : int(y2), int(x1) : int(x2)] += 1
+
+    I_fil = []
+    for x1, y1, x2, y2 in target['boxes']:
+        I_fil.append(img_mask[int(y1) : int(y2), int(x1) : int(x2)].mean() < 1.1)
+    I_fil = torch.BoolTensor(I_fil)
+
+    I_s = I_fil * (target['labels'] < 10) * (target['labels'] >= 0)
+
+    # Calc indexes
+    I_s = torch.nonzero(I_s).view(-1)
+    I_t = I_s[torch.randperm(len(I_s))]
+
+    # keep only portion
+    I_s = I_s[:int(keep * len(target['labels']))]
+    I_t = I_t[:int(keep * len(target['labels']))]
+
+    # Filter wrong pairs
+    wh = (target['boxes'][:, 2:] - target['boxes'][:, :2]).abs()
+    wh_src = wh[I_s, 0] / wh[I_s, 1]
+    wh_dst = wh[I_t, 0] / wh[I_t, 1]
+    I_fil = ((0.8 * wh_dst) < wh_src) * ((1.2 * wh_dst) > wh_src) * (I_s != I_t)
+    I_s = I_s[I_fil]
+    I_t = I_t[I_fil]
+
+    new_classes = target['labels'].clone()
+
+    for s, t in zip(I_s, I_t):
+        t_x1, t_y1, t_x2, t_y2 = [int(i.item()) for i in target['boxes'][t]]
+        s_x1, s_y1, s_x2, s_y2 = [int(i.item()) for i in target['boxes'][s]]
+
+        # Replace image patch in target
+        im_patch_src = img_s[:, s_y1:s_y2, s_x1:s_x2].unsqueeze(0)
+
+        coef = img_t[:, t_y1:t_y2, t_x1:t_x2].mean() / im_patch_src.mean()
+        im_patch_src = torch.clamp(coef * tfunc.interpolate(im_patch_src, size=(t_y2 - t_y1, t_x2 - t_x1)).squeeze(), 0, 1)
+        img_t[:, t_y1:t_y2, t_x1:t_x2] = im_patch_src
+
+        # TODO checking hack
+        #img_t[:, t_y1:t_y1 + 20, t_x1:t_x1 + 20] = 0
+
+        # Replace class in target
+        new_classes[t] = target['labels'][s]
+
+    img_t = T.ToPILImage()(img_t)
+    target['labels'] = new_classes
+
+    return img_t, target
 
 def rot(image, target, angle):
     W, H = image.width, image.height
@@ -239,6 +296,13 @@ class RandomHorizontalFlip(object):
         if random.random() < self.p:
             return hflip(img, target)
         return img, target
+
+class RandomShuffle(object):
+    def __init__(self, keep=0.7):
+        self.keep = keep
+
+    def __call__(self, img, target):
+        return shuffle(img, target, self.keep)
 
 class RandomRotation(object):
     def __init__(self, max_angle):

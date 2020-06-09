@@ -443,10 +443,8 @@ def showImage(img, target):
 
         print('Image:', (img.height, img.width), target['size'], target['orig_size'])
 
-        #if 'size' in target:
-        #H, W = target['size']
-        #else:
-        W, H = img.width, img.height
+        H, W = target['size']
+        #W, H = img.width, img.height
 
         boxes[:, 0::2] *= W
         boxes[:, 1::2] *= H
@@ -455,10 +453,7 @@ def showImage(img, target):
         x1, y1, x2, y2 = boxes[i]
         draw.rectangle((x1, y1, x2, y2), outline=(0, 255, 0) if cl[i] >= 0 else (0, 0, 0), width=3)
         draw.text((x1, y1), str(cl[i].item()), (0, 255, 0) if cl[i] >= 0 else (0, 0, 0),
-                  font=ImageFont.truetype("DejaVuSansMono.ttf", 20))
-
-    draw.text((0, 0), 'Input Tensor Width: ' + str(img.width) + '  Height:' + str(img.height) + '\n' + str(target['boxes'].cpu().numpy()),
-              (255, 255, 255), font=ImageFont.truetype("DejaVuSansMono.ttf", 16))
+                  font=ImageFont.truetype("DejaVuSansMono.ttf", 30))
 
     img.show()
     print()

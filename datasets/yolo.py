@@ -118,6 +118,7 @@ def make_yolo_transforms(image_set):
     if image_set == 'train':
         return T.Compose([
             T.RandomGrayscale(),
+            T.RandomShuffle(),
             T.RandomSelect(
                 T.RandomResize(scales, max_size=1333),
                 T.Compose([
