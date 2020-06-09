@@ -429,3 +429,36 @@ def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corne
         return _new_empty_tensor(input, output_shape)
     else:
         return torchvision.ops.misc.interpolate(input, size, scale_factor, mode, align_corners)
+
+def showImage(img, target):
+    from PIL import Image, ImageDraw, ImageFont
+    from util.box_ops import box_xyxy_to_cxcywh, box_cxcywh_to_xyxy
+
+    draw = ImageDraw.Draw(img)
+    boxes = target['boxes']
+    cl = target['labels']
+
+    if 1:#boxes.max() <= 1:
+        boxes = box_cxcywh_to_xyxy(boxes)
+
+        print('Image:', (img.height, img.width), target['size'], target['orig_size'])
+
+        #if 'size' in target:
+        #H, W = target['size']
+        #else:
+        W, H = img.width, img.height
+
+        boxes[:, 0::2] *= W
+        boxes[:, 1::2] *= H
+
+    for i in range(len(boxes)):
+        x1, y1, x2, y2 = boxes[i]
+        draw.rectangle((x1, y1, x2, y2), outline=(0, 255, 0) if cl[i] >= 0 else (0, 0, 0), width=3)
+        draw.text((x1, y1), str(cl[i].item()), (0, 255, 0) if cl[i] >= 0 else (0, 0, 0),
+                  font=ImageFont.truetype("DejaVuSansMono.ttf", 20))
+
+    draw.text((0, 0), 'Input Tensor Width: ' + str(img.width) + '  Height:' + str(img.height) + '\n' + str(target['boxes'].cpu().numpy()),
+              (255, 255, 255), font=ImageFont.truetype("DejaVuSansMono.ttf", 16))
+
+    img.show()
+    print()

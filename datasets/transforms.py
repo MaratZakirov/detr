@@ -9,9 +9,62 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 
-from util.box_ops import box_xyxy_to_cxcywh
-from util.misc import interpolate
+from util.box_ops import box_xyxy_to_cxcywh, box_cxcywh_to_xyxy
+from util.misc import interpolate, showImage
 
+
+def xy2xy4(xy2):
+    assert xy2.shape[1] == 4
+    xy = (xy2[:, 2:] + xy2[:, :2]) / 2
+    wh = (xy2[:, 2:] - xy2[:, :2]).abs() / 2
+    wh1 = wh * torch.tensor([1, 1])
+    wh2 = wh * torch.tensor([1, -1])
+    wh3 = wh * torch.tensor([-1, 1])
+    wh4 = wh * torch.tensor([-1, -1])
+    xy4 = torch.cat([xy + wh1, xy + wh2, xy + wh3, xy + wh4], dim=1)
+    return xy4
+
+def xy4xy2(xy4):
+    assert xy4.shape[1] == 8
+    xy2 = torch.stack([xy4[:, 0::2].min(dim=1)[0], xy4[:, 1::2].min(dim=1)[0],
+                       xy4[:, 0::2].max(dim=1)[0], xy4[:, 1::2].max(dim=1)[0]]).t()
+    return xy2
+
+def rot(image, target, angle):
+    W, H = image.width, image.height
+
+    image_rotated = F.rotate(image, angle)
+
+    radian = torch.tensor(angle * (3.14 / 180))
+
+    rot_mat = torch.tensor([[torch.cos(radian), -torch.sin(radian)],
+                            [torch.sin(radian), torch.cos(radian)]])
+
+    boxes = target['boxes']
+
+    boxes = xy2xy4(boxes).view(-1, 2)
+    boxes[:, 0] -= W/2
+    boxes[:, 1] -= H/2
+    boxes = (boxes @ rot_mat)
+    boxes[:, 0] += W/2
+    boxes[:, 1] += H/2
+    boxes[:, 0].clamp(min=0, max=W)
+    boxes[:, 1].clamp(min=0, max=H)
+
+    boxes = xy4xy2(boxes.view(-1, 8))
+    target['boxes'] = boxes
+
+    areas = (boxes[:, 2:] - boxes[:, :2]).abs()
+    areas = areas[:, 0] * areas[:, 1]
+
+    keep = areas > 0.8 * target['area']
+
+    for field in ["labels", "area", "iscrowd", "boxes"]:
+        target[field] = target[field][keep]
+
+    #showImage(image_rotated, target)
+
+    return image_rotated, target
 
 def crop(image, target, region):
     cropped_image = F.crop(image, *region)
@@ -187,6 +240,20 @@ class RandomHorizontalFlip(object):
             return hflip(img, target)
         return img, target
 
+class RandomRotation(object):
+    def __init__(self, max_angle):
+        self.max_angle = max_angle
+
+    def __call__(self, img, target):
+        angle = random.randint(-self.max_angle, self.max_angle)
+        return rot(img, target, angle)
+
+class RandomGrayscale(object):
+    def __init__(self, p=0.1):
+        self.rgs = T.RandomGrayscale(p)
+
+    def __call__(self, img, target):
+        return self.rgs(img), target
 
 class RandomResize(object):
     def __init__(self, sizes, max_size=None):
@@ -245,7 +312,7 @@ class Normalize(object):
         self.std = std
 
     def __call__(self, image, target=None):
-        image = F.normalize(image, mean=self.mean, std=self.std)
+        #image = F.normalize(image, mean=self.mean, std=self.std)
         if target is None:
             return image, None
         target = target.copy()
