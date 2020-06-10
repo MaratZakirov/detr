@@ -93,7 +93,7 @@ def get_args_parser():
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
-    parser.add_argument('--seed', default=41, type=int)
+    parser.add_argument('--seed', default=43, type=int)
     parser.add_argument('--resume', default='', help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
@@ -198,14 +198,26 @@ def main(args):
         return
 
     """
+    sizes = []
+
     for i, d in enumerate(data_loader_train):
         img = tf.ToPILImage()(d[0].tensors[0])
         target = d[1][0]
 
         showImage(img, target)
 
-        if i >= 0:
+        sizes.append(target['boxes'][:, 2:] * target['size'])
+
+        if i >= 20:
             break
+
+    sizes = torch.cat(sizes)
+    if 1:
+        import matplotlib.pyplot as plt
+        plt.scatter(sizes[:, 0], sizes[:, 1], s=0.1, c=(0, 0, 0), alpha=0.7)
+        plt.xlabel('w')
+        plt.ylabel('h')
+        plt.show()
 
     exit()
     """

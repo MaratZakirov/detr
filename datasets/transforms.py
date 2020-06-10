@@ -90,7 +90,8 @@ def shuffle(image, target, keep):
 def rot(image, target, angle):
     W, H = image.width, image.height
 
-    image_rotated = F.rotate(image, angle)
+    image_rotated = F.rotate(image, angle, expand=True)
+    Wrot, Hrot = image_rotated.width, image_rotated.height
 
     radian = torch.tensor(angle * (3.14 / 180))
 
@@ -100,13 +101,18 @@ def rot(image, target, angle):
     boxes = target['boxes']
 
     boxes = xy2xy4(boxes).view(-1, 2)
-    boxes[:, 0] -= W/2
-    boxes[:, 1] -= H/2
+
+    #shift x,y coordinates
+    boxes[:, 0] += (Wrot - W)/2
+    boxes[:, 1] += (Hrot - H)/2
+
+    boxes[:, 0] -= Wrot/2
+    boxes[:, 1] -= Hrot/2
     boxes = (boxes @ rot_mat)
-    boxes[:, 0] += W/2
-    boxes[:, 1] += H/2
-    boxes[:, 0].clamp(min=0, max=W)
-    boxes[:, 1].clamp(min=0, max=H)
+    boxes[:, 0] += Wrot/2
+    boxes[:, 1] += Hrot/2
+    boxes[:, 0].clamp(min=0, max=Wrot)
+    boxes[:, 1].clamp(min=0, max=Hrot)
 
     boxes = xy4xy2(boxes.view(-1, 8))
     target['boxes'] = boxes
@@ -119,7 +125,8 @@ def rot(image, target, angle):
     for field in ["labels", "area", "iscrowd", "boxes"]:
         target[field] = target[field][keep]
 
-    #showImage(image_rotated, target)
+    target['size'][0] = Hrot
+    target['size'][1] = Wrot
 
     return image_rotated, target
 

@@ -441,7 +441,7 @@ def showImage(img, target):
     if 1:#boxes.max() <= 1:
         boxes = box_cxcywh_to_xyxy(boxes)
 
-        print('Image:', (img.height, img.width), target['size'], target['orig_size'])
+        print('Image:', (img.height, img.width), 'true:', target['size'], target['orig_size'])
 
         H, W = target['size']
         #W, H = img.width, img.height
@@ -456,4 +456,3 @@ def showImage(img, target):
                   font=ImageFont.truetype("DejaVuSansMono.ttf", 30))
 
     img.show()
-    print()

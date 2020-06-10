@@ -113,29 +113,23 @@ def make_yolo_transforms(image_set):
         T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
-    scales = [480, 512, 544, 576, 608, 640]#, 672, 704, 736, 768, 800]
-
     if image_set == 'train':
         return T.Compose([
-            T.RandomGrayscale(),
-            T.RandomShuffle(),
+            T.RandomShuffle(keep=0.7),
             T.RandomSelect(
-                T.RandomResize(scales, max_size=1333),
-                T.Compose([
-                    T.RandomResize([400, 500, 600]),
-                    T.RandomRotation(40),
-                    T.RandomSizeCrop(384, 600),
-                    T.RandomResize(scales, max_size=1333),
-                ])
+                T.RandomRotation(180),
+                T.RandomGrayscale(p=0.07),
             ),
+            T.RandomSelect(
+                T.RandomSizeCrop(384, 600),
+                T.RandomGrayscale(p=0.07),
+            ),
+            T.RandomResize([400, 450, 500, 550, 600, 650]),
             normalize,
         ])
 
     if image_set == 'val':
-        return T.Compose([
-            T.RandomResize([800], max_size=1333),
-            normalize,
-        ])
+        return T.Compose([T.RandomResize([640]), normalize])
 
     raise ValueError(f'unknown {image_set}')
 
